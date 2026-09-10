@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Billing</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>Billing</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="quickbill">Quick Bill</button>
+      <button class="tab-btn" data-tab="new">New Invoice</button>
+      <button class="tab-btn" data-tab="history">Past Invoices</button>
+      <button class="tab-btn" data-tab="parties">Sale Parties</button>
+      <button class="tab-btn" data-tab="items">Items</button>
+      <button class="tab-btn" data-tab="settings">Business Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- QUICK BILL -->
+    <section id="tab-quickbill" class="tab-panel active">
+      <div class="card">
+        <h2>Paste a message</h2>
+        <p class="hint">Paste the client's shorthand, one party per block, e.g.:<br>
+          <code>Rinku sobti&#10;8000plus 18&#10;&#10;Jain zari&#10;30*180&#10;Plus 5</code>
+        </p>
+        <textarea id="qb-input" rows="10" placeholder="Party name&#10;amount plus tax%&#10;&#10;Next party&#10;qty*rate&#10;Plus tax%"></textarea>
+        <div class="actions">
+          <button type="button" id="qb-parse-btn" class="btn-primary">Parse</button>
+          <span id="qb-parse-status"></span>
+        </div>
+      </div>
+
+      <div class="card" id="qb-preview-card" style="display:none">
+        <h2>Review before generating</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>You typed</th>
+              <th>Party</th>
+              <th>Item</th>
+              <th class="num">Qty</th>
+              <th class="num">Rate</th>
+              <th class="num">Tax %</th>
+              <th class="num">Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="qb-preview-body"></tbody>
+        </table>
+        <div class="actions">
+          <button type="button" id="qb-generate-btn" class="btn-primary">Generate All Bills</button>
+          <span id="qb-generate-status"></span>
+        </div>
+      </div>
+
+      <div class="card" id="qb-results-card" style="display:none">
+        <h2>Generated</h2>
+        <ul id="qb-results-list" class="qb-results"></ul>
+      </div>
+    </section>
+
+    <!-- NEW INVOICE -->
+    <section id="tab-new" class="tab-panel">
+      <form id="invoice-form">
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label>Invoice #</label>
+              <input type="text" id="invoice-number" disabled />
+            </div>
+            <div class="field">
+              <label>Date</label>
+              <input type="date" id="date" required />
+            </div>
+            <div class="field">
+              <label>Due Date</label>
+              <input type="date" id="dueDate" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Bill To</h2>
+          <div class="row">
+            <div class="field grow">
+              <label>Client Name</label>
+              <input type="text" id="clientName" list="party-names" required placeholder="Start typing a saved party, or enter a new name" autocomplete="off" />
+              <datalist id="party-names"></datalist>
+            </div>
+            <div class="field">
+              <label>Client GSTIN (optional)</label>
+              <input type="text" id="clientGSTIN" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Client Address</label>
+            <textarea id="clientAddress" rows="2"></textarea>
+          </div>
+          <p class="hint">New client names are added to your Sale Parties list automatically when you generate the bill.</p>
+        </div>
+
+        <div class="card">
+          <h2>Line Items</h2>
+          <datalist id="item-names"></datalist>
+          <table id="items-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>HSN/SAC</th>
+                <th class="num">Qty</th>
+                <th>Unit</th>
+                <th class="num">Rate</th>
+                <th class="num">Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="items-body"></tbody>
+          </table>
+          <button type="button" id="add-item" class="btn-link">+ Add line item</button>
+
+          <div class="totals">
+            <div class="row">
+              <div class="field">
+                <label>Discount (₹)</label>
+                <input type="number" id="discount" value="0" min="0" step="0.01" />
+              </div>
+              <div class="field">
+                <label>Tax (%)</label>
+                <input type="number" id="taxPercent" min="0" step="0.01" />
+              </div>
+            </div>
+            <div class="totals-summary">
+              <div><span>Subtotal</span><strong id="sum-subtotal">₹0.00</strong></div>
+              <div><span>Tax</span><strong id="sum-tax">₹0.00</strong></div>
+              <div><span>Discount</span><strong id="sum-discount">₹0.00</strong></div>
+              <div class="grand"><span>Total</span><strong id="sum-total">₹0.00</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Notes &amp; Terms</h2>
+          <div class="field">
+            <label>Notes</label>
+            <textarea id="notes" rows="2" placeholder="Optional note to the client"></textarea>
+          </div>
+          <div class="field">
+            <label>Terms</label>
+            <textarea id="terms" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Generate Bill (PDF)</button>
+          <span id="form-status"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="tab-history" class="tab-panel">
+      <div class="card">
+        <h2>Past Invoices</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Client</th>
+              <th class="num">Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+        <p id="history-empty" class="empty-msg" style="display:none">No invoices yet.</p>
+      </div>
+    </section>
+
+    <!-- PARTIES -->
+    <section id="tab-parties" class="tab-panel">
+      <div class="card">
+        <h2 id="party-form-title">Add a Sale Party</h2>
+        <form id="party-form">
+          <div class="row">
+            <div class="field grow">
+              <label>Party Name</label>
+              <input type="text" id="p-name" required />
+            </div>
+            <div class="field">
+              <label>GSTIN</label>
+              <input type="text" id="p-gstin" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Address</label>
+            <textarea id="p-address" rows="2"></textarea>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary" id="party-submit-btn">Add Party</button>
+            <button type="button" id="party-cancel-edit" class="btn-link" style="display:none">Cancel edit</button>
+            <span id="party-status"></span>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Saved Parties</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>GSTIN</th>
+              <th>Address</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="parties-body"></tbody>
+        </table>
+        <p id="parties-empty" class="empty-msg" style="display:none">No saved parties yet — add one above, or paste a list below.</p>
+      </div>
+
+      <div class="card">
+        <h2>Bulk Import</h2>
+        <p class="hint">Paste one party per line as <code>Name, GSTIN, Address</code>. GSTIN and address are optional per line.</p>
+        <textarea id="bulk-import" rows="5" placeholder="Acme Corp, 27AAAAA0000A1Z5, 221B Baker Street, Mumbai&#10;Beta Traders, , Shop 4, Market Road, Pune"></textarea>
+        <div class="actions">
+          <button type="button" id="bulk-import-btn" class="btn-primary">Import List</button>
+          <span id="bulk-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ITEMS -->
+    <section id="tab-items" class="tab-panel">
+      <div class="card">
+        <h2 id="item-form-title">Add an Item</h2>
+        <form id="item-form">
+          <div class="row">
+            <div class="field grow">
+              <label>Description</label>
+              <input type="text" id="i-description" required />
+            </div>
+            <div class="field">
+              <label>HSN/SAC</label>
+              <input type="text" id="i-hsn" />
+            </div>
+            <div class="field">
+              <label>GST Rate (%)</label>
+              <input type="number" id="i-gstRate" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary" id="item-submit-btn">Add Item</button>
+            <button type="button" id="item-cancel-edit" class="btn-link" style="display:none">Cancel edit</button>
+            <span id="item-status"></span>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Saved Items</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>HSN/SAC</th>
+              <th class="num">GST %</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="items-master-body"></tbody>
+        </table>
+        <p id="items-master-empty" class="empty-msg" style="display:none">No saved items yet — add one above, or paste a list below.</p>
+      </div>
+
+      <div class="card">
+        <h2>Bulk Import</h2>
+        <p class="hint">Paste one item per line as <code>Description, HSN, GST Rate</code>. HSN and GST rate are optional per line.</p>
+        <textarea id="items-bulk-import" rows="5" placeholder="Chatons glass beads 18 pkt, 7018, 18&#10;Glass beads pkt, 7018, 5"></textarea>
+        <div class="actions">
+          <button type="button" id="items-bulk-import-btn" class="btn-primary">Import List</button>
+          <span id="items-bulk-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="tab-panel">
+      <form id="settings-form">
+        <div class="card">
+          <h2>Your Business</h2>
+          <div class="field">
+            <label>Business Name</label>
+            <input type="text" id="s-businessName" />
+          </div>
+          <div class="field">
+            <label>Address</label>
+            <textarea id="s-businessAddress" rows="2"></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>GSTIN</label>
+              <input type="text" id="s-businessGSTIN" />
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input type="email" id="s-businessEmail" />
+            </div>
+            <div class="field">
+              <label>Phone</label>
+              <input type="text" id="s-businessPhone" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Bank Details (shown on invoice)</h2>
+          <div class="row">
+            <div class="field">
+              <label>Account Name</label>
+              <input type="text" id="s-bankAccountName" />
+            </div>
+            <div class="field">
+              <label>Bank Name</label>
+              <input type="text" id="s-bankName" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Account Number</label>
+              <input type="text" id="s-bankAccountNumber" />
+            </div>
+            <div class="field">
+              <label>IFSC</label>
+              <input type="text" id="s-bankIFSC" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Invoice Defaults</h2>
+          <div class="row">
+            <div class="field">
+              <label>Invoice Number Prefix</label>
+              <input type="text" id="s-invoicePrefix" />
+            </div>
+            <div class="field">
+              <label>Next Invoice Number</label>
+              <input type="number" id="s-nextNumber" min="1" />
+            </div>
+            <div class="field">
+              <label>Default Tax (%)</label>
+              <input type="number" id="s-defaultTaxPercent" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Default Terms</label>
+            <textarea id="s-defaultTerms" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Save Settings</button>
+          <span id="settings-status"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
