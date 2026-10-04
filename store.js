@@ -31,7 +31,8 @@ const DEFAULT_SETTINGS = {
   nextNumber: 1,
   defaultTaxPercent: 18,
   defaultNotes: '',
-  defaultTerms: 'Payment due within 15 days.'
+  defaultTerms: 'Payment due within 15 days.',
+  ewayBillThreshold: 50000
 };
 
 function readJsonSync(file, fallback) {

@@ -5,6 +5,7 @@ const store = require('./store');
 const db = require('./db');
 const { createInvoice } = require('./createInvoice');
 const { parseShorthand } = require('./quickbill');
+const { buildEwayBillJson } = require('./ewaybill');
 
 const app = express();
 const PORT = process.env.PORT || 4321;
@@ -193,6 +194,21 @@ app.delete('/api/invoices/:id', async (req, res) => {
   const ok = await store.deleteInvoice(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true });
+});
+
+// Builds the E-way Bill JSON for one invoice so the user can upload it
+// themselves at ewaybillgst.gov.in — this app never talks to that portal.
+app.post('/api/invoices/:id/eway-bill', async (req, res) => {
+  const invoice = await store.getInvoice(req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Not found' });
+  const settings = await store.getSettings();
+  try {
+    const json = buildEwayBillJson(invoice, settings, req.body || {});
+    res.json(json);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build e-way bill JSON.' });
+  }
 });
 
 (async () => {

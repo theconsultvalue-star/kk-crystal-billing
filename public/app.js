@@ -362,9 +362,13 @@ async function loadHistory() {
   const body = $('#history-body');
   body.innerHTML = '';
   $('#history-empty').style.display = ledger.length ? 'none' : 'block';
+  $('#ewb-card').style.display = 'none';
+
+  const threshold = Number(currentSettings.ewayBillThreshold ?? 50000);
 
   ledger.forEach((inv) => {
     const tr = document.createElement('tr');
+    const showEwb = inv.total >= threshold;
     tr.innerHTML = `
       <td>${inv.number}</td>
       <td>${inv.date}</td>
@@ -373,17 +377,104 @@ async function loadHistory() {
       <td>
         <a class="pdf-link" href="/invoices-files/${inv.pdfFile}" target="_blank">PDF</a>
         &nbsp;·&nbsp;
-        <button class="link-btn" data-id="${inv.id}">Delete</button>
+        ${showEwb ? '<button class="link-btn ewb-btn" style="color: var(--accent)">E-way Bill</button>&nbsp;·&nbsp;' : ''}
+        <button class="link-btn delete-btn">Delete</button>
       </td>
     `;
-    tr.querySelector('.link-btn').addEventListener('click', async () => {
+    tr.querySelector('.delete-btn').addEventListener('click', async () => {
       if (!confirm(`Delete invoice ${inv.number}? This cannot be undone.`)) return;
       await fetch(`/api/invoices/${inv.id}`, { method: 'DELETE' });
       loadHistory();
     });
+    if (showEwb) {
+      tr.querySelector('.ewb-btn').addEventListener('click', () => openEwayBillForm(inv));
+    }
     body.appendChild(tr);
   });
 }
+
+// ---------- E-way Bill ----------
+function ewbGuessPincode(address) {
+  const m = (address || '').match(/\b(\d{6})\b/);
+  return m ? m[1] : '';
+}
+
+function ewbGuessPlace(address) {
+  if (!address) return '';
+  const parts = address.split(',').map((s) => s.trim()).filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (!/^\d+$/.test(parts[i])) return parts[i];
+  }
+  return '';
+}
+
+function openEwayBillForm(invoice) {
+  $('#ewb-card').style.display = 'block';
+  $('#ewb-invoice-label').textContent = `${invoice.number} — ${invoice.clientName} — ${fmt(invoice.total)}`;
+  $('#ewb-fromPlace').value = ewbGuessPlace(currentSettings.businessAddress);
+  $('#ewb-fromPincode').value = ewbGuessPincode(currentSettings.businessAddress);
+  $('#ewb-toPlace').value = ewbGuessPlace(invoice.clientAddress);
+  $('#ewb-toPincode').value = ewbGuessPincode(invoice.clientAddress);
+  $('#ewb-transDistance').value = '';
+  $('#ewb-vehicleNo').value = '';
+  $('#ewb-transporterName').value = '';
+  $('#ewb-transporterId').value = '';
+  $('#ewb-status').textContent = '';
+  $('#ewb-card').dataset.invoiceId = invoice.id;
+  $('#ewb-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+$('#ewb-cancel-btn').addEventListener('click', () => {
+  $('#ewb-card').style.display = 'none';
+});
+
+$('#ewb-generate-btn').addEventListener('click', async () => {
+  const status = $('#ewb-status');
+  const invoiceId = $('#ewb-card').dataset.invoiceId;
+  const payload = {
+    docType: $('#ewb-docType').value,
+    subSupplyType: $('#ewb-subSupplyType').value,
+    fromPlace: $('#ewb-fromPlace').value,
+    fromPincode: $('#ewb-fromPincode').value,
+    toPlace: $('#ewb-toPlace').value,
+    toPincode: $('#ewb-toPincode').value,
+    transMode: $('#ewb-transMode').value,
+    transDistance: $('#ewb-transDistance').value,
+    vehicleNo: $('#ewb-vehicleNo').value,
+    vehicleType: $('#ewb-vehicleType').value,
+    transporterName: $('#ewb-transporterName').value,
+    transporterId: $('#ewb-transporterId').value
+  };
+
+  status.textContent = 'Building...';
+  status.className = '';
+
+  try {
+    const res = await fetch(`/api/invoices/${invoiceId}/eway-bill`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not build the e-way bill JSON.');
+
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `eway-bill-${json.docNo.replace(/[^a-zA-Z0-9-]/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    status.textContent = 'Downloaded. Upload this on the e-way bill portal yourself.';
+    status.className = 'success';
+  } catch (err) {
+    status.textContent = err.message;
+    status.className = 'error';
+  }
+});
 
 // ---------- Sale Parties management tab ----------
 let editingPartyId = null;
@@ -640,6 +731,7 @@ async function loadSettings() {
   $('#s-nextNumber').value = s.nextNumber || 1;
   $('#s-defaultTaxPercent').value = s.defaultTaxPercent ?? 0;
   $('#s-defaultTerms').value = s.defaultTerms || '';
+  $('#s-ewayBillThreshold').value = s.ewayBillThreshold ?? 50000;
 }
 
 $('#settings-form').addEventListener('submit', async (e) => {
@@ -658,13 +750,15 @@ $('#settings-form').addEventListener('submit', async (e) => {
     invoicePrefix: $('#s-invoicePrefix').value,
     nextNumber: Number($('#s-nextNumber').value) || 1,
     defaultTaxPercent: Number($('#s-defaultTaxPercent').value) || 0,
-    defaultTerms: $('#s-defaultTerms').value
+    defaultTerms: $('#s-defaultTerms').value,
+    ewayBillThreshold: Number($('#s-ewayBillThreshold').value) || 0
   };
   await fetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  currentSettings = { ...currentSettings, ...payload };
   status.textContent = 'Saved.';
   status.className = 'success';
   setTimeout(() => { status.textContent = ''; }, 2000);

@@ -180,6 +180,91 @@
         </table>
         <p id="history-empty" class="empty-msg" style="display:none">No invoices yet.</p>
       </div>
+
+      <div class="card" id="ewb-card" style="display:none">
+        <h2>E-way Bill — <span id="ewb-invoice-label"></span></h2>
+        <p class="hint">Fill in the transport details, then download the JSON and upload it yourself at <code>ewaybillgst.gov.in</code> → Bulk Generation. Double-check the pre-filled From/To place and pincode — they're a best-effort guess from the saved address.</p>
+        <div class="row">
+          <div class="field">
+            <label>Document Type</label>
+            <select id="ewb-docType">
+              <option value="INV">Tax Invoice</option>
+              <option value="BIL">Bill of Supply</option>
+              <option value="CHL">Delivery Challan</option>
+              <option value="OTH">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sub Supply Type</label>
+            <select id="ewb-subSupplyType">
+              <option value="supply">Supply</option>
+              <option value="export">Export</option>
+              <option value="jobwork">Job Work</option>
+              <option value="ownuse">For Own Use</option>
+              <option value="others">Others</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>From Place</label>
+            <input type="text" id="ewb-fromPlace" />
+          </div>
+          <div class="field">
+            <label>From Pincode</label>
+            <input type="text" id="ewb-fromPincode" maxlength="6" />
+          </div>
+          <div class="field">
+            <label>To Place</label>
+            <input type="text" id="ewb-toPlace" />
+          </div>
+          <div class="field">
+            <label>To Pincode</label>
+            <input type="text" id="ewb-toPincode" maxlength="6" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Transport Mode</label>
+            <select id="ewb-transMode">
+              <option value="road">Road</option>
+              <option value="rail">Rail</option>
+              <option value="air">Air</option>
+              <option value="ship">Ship</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Distance (km)</label>
+            <input type="number" id="ewb-transDistance" min="0" />
+          </div>
+          <div class="field">
+            <label>Vehicle Number</label>
+            <input type="text" id="ewb-vehicleNo" placeholder="e.g. DL01AB1234" />
+          </div>
+          <div class="field">
+            <label>Vehicle Type</label>
+            <select id="ewb-vehicleType">
+              <option value="regular">Regular</option>
+              <option value="odc">Over Dimensional Cargo</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Transporter Name (optional)</label>
+            <input type="text" id="ewb-transporterName" />
+          </div>
+          <div class="field">
+            <label>Transporter ID / GSTIN (optional)</label>
+            <input type="text" id="ewb-transporterId" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="ewb-generate-btn" class="btn-primary">Download E-way Bill JSON</button>
+          <button type="button" id="ewb-cancel-btn" class="btn-link">Cancel</button>
+          <span id="ewb-status"></span>
+        </div>
+      </div>
     </section>
 
     <!-- PARTIES -->
@@ -362,6 +447,15 @@
           <div class="field">
             <label>Default Terms</label>
             <textarea id="s-defaultTerms" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>E-way Bill</h2>
+          <p class="hint">Bills at or above this value will show an "E-way Bill" option in Past Invoices, producing a JSON file to upload yourself at <code>ewaybillgst.gov.in</code> (this app never submits anything there on its own).</p>
+          <div class="field" style="max-width: 220px">
+            <label>Threshold (₹)</label>
+            <input type="number" id="s-ewayBillThreshold" min="0" step="1" />
           </div>
         </div>
 
