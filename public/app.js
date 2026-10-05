@@ -9,16 +9,16 @@ let currentItems = [];
 let qbRows = [];
 
 // ---------- Tabs ----------
+function switchTab(name) {
+  $$('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  $$('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${name}`));
+  if (name === 'history') return loadHistory();
+  if (name === 'parties') return loadParties();
+  if (name === 'items') return loadItemsMaster();
+}
+
 $$('.tab-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    $$('.tab-btn').forEach((b) => b.classList.remove('active'));
-    $$('.tab-panel').forEach((p) => p.classList.remove('active'));
-    btn.classList.add('active');
-    $(`#tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'history') loadHistory();
-    if (btn.dataset.tab === 'parties') loadParties();
-    if (btn.dataset.tab === 'items') loadItemsMaster();
-  });
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
 // ---------- Quick Bill (paste-and-parse) ----------
@@ -145,13 +145,19 @@ $('#qb-generate-btn').addEventListener('click', async () => {
     });
     const results = await res.json();
 
+    const ewbThreshold = Number(currentSettings.ewayBillThreshold ?? 50000);
     const list = $('#qb-results-list');
     list.innerHTML = '';
     results.forEach((r) => {
       const li = document.createElement('li');
       if (r.ok) {
+        const needsEwb = r.invoice.total >= ewbThreshold;
         li.innerHTML = `<span class="qb-ok">✓ ${r.invoice.number} — ${r.invoice.clientName} — ${fmt(r.invoice.total)}</span>
-          <a class="pdf-link" href="${r.invoice.pdfUrl}" target="_blank">Open PDF</a>`;
+          <a class="pdf-link" href="${r.invoice.pdfUrl}" target="_blank">Open PDF</a>
+          ${needsEwb ? '<button type="button" class="link-btn ewb-prompt-btn" style="color: var(--accent)">E-way Bill</button>' : ''}`;
+        if (needsEwb) {
+          li.querySelector('.ewb-prompt-btn').addEventListener('click', () => openEwayBillForm(r.invoice));
+        }
       } else {
         li.innerHTML = `<span class="qb-fail">✗ ${r.row.clientName}: ${r.error}</span>`;
       }
@@ -341,8 +347,15 @@ $('#invoice-form').addEventListener('submit', async (e) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to generate invoice.');
 
-    status.innerHTML = `Bill ${data.number} created — <a class="pdf-link" href="${data.pdfUrl}" target="_blank">Open PDF</a>`;
+    const threshold = Number(currentSettings.ewayBillThreshold ?? 50000);
+    const ewbPrompt = data.total >= threshold
+      ? ` — <span class="qb-duplicate">⚠ ₹${threshold.toLocaleString('en-IN')}+, needs an E-way Bill</span> <button type="button" class="link-btn ewb-prompt-btn" style="color: var(--accent)">Generate it</button>`
+      : '';
+    status.innerHTML = `Bill ${data.number} created — <a class="pdf-link" href="${data.pdfUrl}" target="_blank">Open PDF</a>${ewbPrompt}`;
     status.className = 'success';
+    if (data.total >= threshold) {
+      status.querySelector('.ewb-prompt-btn').addEventListener('click', () => openEwayBillForm(data));
+    }
 
     // Reset form for next bill
     document.getElementById('invoice-form').reset();
@@ -408,7 +421,12 @@ function ewbGuessPlace(address) {
   return '';
 }
 
-function openEwayBillForm(invoice) {
+async function openEwayBillForm(invoice) {
+  // Callable from anywhere (New Invoice / Quick Bill success messages, not
+  // just the Past Invoices row) — the form itself lives in that tab's panel.
+  // Must wait for loadHistory() to finish before showing the card, since it
+  // resets #ewb-card to hidden as part of its own render.
+  await switchTab('history');
   $('#ewb-card').style.display = 'block';
   $('#ewb-invoice-label').textContent = `${invoice.number} — ${invoice.clientName} — ${fmt(invoice.total)}`;
   $('#ewb-fromPlace').value = ewbGuessPlace(currentSettings.businessAddress);
