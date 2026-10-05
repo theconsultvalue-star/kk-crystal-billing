@@ -44,6 +44,10 @@ function renderQbPreview() {
 
     const warningsHtml = row.warnings.map((w) => `<span class="qb-warning">⚠ ${w}</span>`).join('');
     const dupHtml = row.duplicateOf ? `<span class="qb-duplicate">⚠ Possible duplicate of ${row.duplicateOf}</span>` : '';
+    const ewbThreshold = Number(currentSettings.ewayBillThreshold ?? 50000);
+    const ewbHtml = qbRowTotal(row) >= ewbThreshold
+      ? `<span class="qb-duplicate ewb-indicator">⚠ Needs an E-way Bill (₹${ewbThreshold.toLocaleString('en-IN')}+)</span>`
+      : `<span class="ewb-indicator"></span>`;
 
     tr.innerHTML = `
       <td class="qb-you-typed">${qbTypedSummary(row)}</td>
@@ -55,7 +59,7 @@ function renderQbPreview() {
       <td><input type="number" class="qb-qty" min="0" step="1" value="${row.qty}" /></td>
       <td><input type="number" class="qb-rate" min="0" step="0.01" value="${row.rate}" /></td>
       <td><input type="number" class="qb-tax" min="0" step="0.01" value="${row.taxPercent}" /></td>
-      <td class="num qb-total">${fmt(qbRowTotal(row))}</td>
+      <td class="num qb-total">${fmt(qbRowTotal(row))}${ewbHtml}</td>
       <td>
         ${dupHtml}
         <label style="font-size:11px; display:flex; align-items:center; gap:4px; margin-top:3px;">
@@ -79,7 +83,12 @@ function renderQbPreview() {
       row.qty = Number(tr.querySelector('.qb-qty').value) || 0;
       row.rate = Number(tr.querySelector('.qb-rate').value) || 0;
       row.taxPercent = Number(tr.querySelector('.qb-tax').value) || 0;
-      tr.querySelector('.qb-total').textContent = fmt(qbRowTotal(row));
+      tr.querySelector('.qb-total').firstChild.textContent = fmt(qbRowTotal(row));
+
+      const ewbT = Number(currentSettings.ewayBillThreshold ?? 50000);
+      const indicator = tr.querySelector('.ewb-indicator');
+      indicator.textContent = qbRowTotal(row) >= ewbT ? `⚠ Needs an E-way Bill (₹${ewbT.toLocaleString('en-IN')}+)` : '';
+      indicator.classList.toggle('qb-duplicate', qbRowTotal(row) >= ewbT);
     };
 
     tr.querySelectorAll('.qb-party, .qb-item, .qb-qty, .qb-rate, .qb-tax').forEach((inp) => {
