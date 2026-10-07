@@ -32,7 +32,14 @@ const DEFAULT_SETTINGS = {
   defaultTaxPercent: 18,
   defaultNotes: '',
   defaultTerms: 'Payment due within 15 days.',
-  ewayBillThreshold: 50000
+  ewayBillThreshold: 50000,
+  // Tally export: ledger names must match the Tally company; {rate} is
+  // replaced with the GST rate (e.g. "Sales @18%", "CGST Output @9%").
+  tallyCompanyName: '',
+  tallySalesLedger: 'Sales @{rate}%',
+  tallyCgstLedger: 'CGST Output @{rate}%',
+  tallySgstLedger: 'SGST Output @{rate}%',
+  tallyIgstLedger: 'IGST Output @{rate}%'
 };
 
 function readJsonSync(file, fallback) {

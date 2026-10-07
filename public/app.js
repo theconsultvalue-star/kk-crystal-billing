@@ -741,6 +741,35 @@ $('#items-bulk-import-btn').addEventListener('click', async () => {
   refreshItemDatalist();
 });
 
+// ---------- Tally export ----------
+// Defaults to the current month so the usual "send this month to Tally" is one click.
+(function initTallyExport() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const ym = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  $('#tally-from').value = `${ym}-01`;
+  $('#tally-to').value = `${ym}-${pad(lastDay)}`;
+})();
+
+$('#tally-export-btn').addEventListener('click', () => {
+  const from = $('#tally-from').value;
+  const to = $('#tally-to').value;
+  const status = $('#tally-status');
+  if (from && to && from > to) {
+    status.textContent = '"From" date is after "To" date.';
+    status.className = 'error';
+    return;
+  }
+  status.textContent = '';
+  const qs = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+  // Navigating (rather than fetch) lets the browser save the attachment and
+  // reuse the existing login.
+  window.location.href = `/api/tally-export?${qs}`;
+});
+
 // ---------- Settings ----------
 async function loadSettings() {
   const s = await fetch('/api/settings').then((r) => r.json());
@@ -759,6 +788,11 @@ async function loadSettings() {
   $('#s-defaultTaxPercent').value = s.defaultTaxPercent ?? 0;
   $('#s-defaultTerms').value = s.defaultTerms || '';
   $('#s-ewayBillThreshold').value = s.ewayBillThreshold ?? 50000;
+  $('#s-tallyCompanyName').value = s.tallyCompanyName || '';
+  $('#s-tallySalesLedger').value = s.tallySalesLedger || 'Sales @{rate}%';
+  $('#s-tallyCgstLedger').value = s.tallyCgstLedger || 'CGST Output @{rate}%';
+  $('#s-tallySgstLedger').value = s.tallySgstLedger || 'SGST Output @{rate}%';
+  $('#s-tallyIgstLedger').value = s.tallyIgstLedger || 'IGST Output @{rate}%';
 }
 
 $('#settings-form').addEventListener('submit', async (e) => {
@@ -778,7 +812,12 @@ $('#settings-form').addEventListener('submit', async (e) => {
     nextNumber: Number($('#s-nextNumber').value) || 1,
     defaultTaxPercent: Number($('#s-defaultTaxPercent').value) || 0,
     defaultTerms: $('#s-defaultTerms').value,
-    ewayBillThreshold: Number($('#s-ewayBillThreshold').value) || 0
+    ewayBillThreshold: Number($('#s-ewayBillThreshold').value) || 0,
+    tallyCompanyName: $('#s-tallyCompanyName').value.trim(),
+    tallySalesLedger: $('#s-tallySalesLedger').value.trim() || 'Sales @{rate}%',
+    tallyCgstLedger: $('#s-tallyCgstLedger').value.trim() || 'CGST Output @{rate}%',
+    tallySgstLedger: $('#s-tallySgstLedger').value.trim() || 'SGST Output @{rate}%',
+    tallyIgstLedger: $('#s-tallyIgstLedger').value.trim() || 'IGST Output @{rate}%'
   };
   await fetch('/api/settings', {
     method: 'POST',

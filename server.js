@@ -6,6 +6,7 @@ const db = require('./db');
 const { createInvoice } = require('./createInvoice');
 const { parseShorthand } = require('./quickbill');
 const { buildEwayBillJson } = require('./ewaybill');
+const { buildTallyXml } = require('./tally');
 
 const app = express();
 const PORT = process.env.PORT || 4321;
@@ -209,6 +210,28 @@ app.post('/api/invoices/:id/eway-bill', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to build e-way bill JSON.' });
   }
+});
+
+// Tally import file (Sales vouchers) for a date range, e.g.
+// /api/tally-export?from=2026-04-01&to=2026-04-30. Ledger names come from
+// Business Settings, and can be overridden per request with
+// ?salesLedger=&cgstLedger=&sgstLedger=&igstLedger= ({rate} = GST rate).
+app.get('/api/tally-export', async (req, res) => {
+  const { from = '', to = '' } = req.query;
+  const [ledger, settings] = await Promise.all([store.getLedger(), store.getSettings()]);
+  const invoices = ledger
+    .filter((inv) => (!from || inv.date >= from) && (!to || inv.date <= to))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const xml = buildTallyXml(invoices, settings, {
+    sales: req.query.salesLedger || settings.tallySalesLedger,
+    cgst: req.query.cgstLedger || settings.tallyCgstLedger,
+    sgst: req.query.sgstLedger || settings.tallySgstLedger,
+    igst: req.query.igstLedger || settings.tallyIgstLedger
+  });
+  const name = `tally-sales${from ? '-' + from : ''}${to ? '-to-' + to : ''}.xml`;
+  res.set('Content-Type', 'application/xml');
+  res.set('Content-Disposition', `attachment; filename="${name}"`);
+  res.send(xml);
 });
 
 (async () => {

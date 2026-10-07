@@ -181,6 +181,25 @@
         <p id="history-empty" class="empty-msg" style="display:none">No invoices yet.</p>
       </div>
 
+      <div class="card">
+        <h2>Export to Tally</h2>
+        <p class="hint">Downloads the bills in this date range as a Tally XML file. In Tally: Gateway of Tally → Import → Vouchers, and pick this file. The sales/GST ledger names in Business Settings must already exist in Tally, and the customer ledgers (under Sundry Debtors) too. Take a Tally backup first, and don't import the same period twice.</p>
+        <div class="row">
+          <div class="field">
+            <label>From</label>
+            <input type="date" id="tally-from" />
+          </div>
+          <div class="field">
+            <label>To</label>
+            <input type="date" id="tally-to" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="tally-export-btn" class="btn-primary">Download Tally XML</button>
+          <span id="tally-status"></span>
+        </div>
+      </div>
+
       <div class="card" id="ewb-card" style="display:none">
         <h2>E-way Bill — <span id="ewb-invoice-label"></span></h2>
         <p class="hint">Fill in the transport details, then download the JSON and upload it yourself at <code>ewaybillgst.gov.in</code> → Bulk Generation. Double-check the pre-filled From/To place and pincode — they're a best-effort guess from the saved address.</p>
@@ -456,6 +475,35 @@
           <div class="field" style="max-width: 220px">
             <label>Threshold (₹)</label>
             <input type="number" id="s-ewayBillThreshold" min="0" step="1" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Tally</h2>
+          <p class="hint">Names used in the Tally export. They must match the ledgers in your Tally company exactly. <code>{rate}</code> is replaced with the GST rate — e.g. <code>Sales @{rate}%</code> becomes "Sales @18%", and for CGST/SGST it becomes half the rate ("CGST Output @9%").</p>
+          <div class="field">
+            <label>Tally Company Name (blank = Business Name)</label>
+            <input type="text" id="s-tallyCompanyName" />
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Sales Ledger</label>
+              <input type="text" id="s-tallySalesLedger" />
+            </div>
+            <div class="field">
+              <label>IGST Ledger</label>
+              <input type="text" id="s-tallyIgstLedger" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>CGST Ledger</label>
+              <input type="text" id="s-tallyCgstLedger" />
+            </div>
+            <div class="field">
+              <label>SGST Ledger</label>
+              <input type="text" id="s-tallySgstLedger" />
+            </div>
           </div>
         </div>
 
