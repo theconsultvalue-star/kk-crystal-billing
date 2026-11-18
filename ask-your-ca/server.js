@@ -19,6 +19,15 @@ const PUBLIC = path.join(__dirname, 'public');
 // ---- Public: login ----
 app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC, 'login.html')));
 app.get('/style.css', (req, res) => res.sendFile(path.join(PUBLIC, 'style.css')));
+// Phone-app files must load before login (the browser fetches them on its own).
+app.get('/manifest.webmanifest', (req, res) => {
+  res.type('application/manifest+json').sendFile(path.join(PUBLIC, 'manifest.webmanifest'));
+});
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache'); // so app updates reach phones promptly
+  res.sendFile(path.join(PUBLIC, 'sw.js'));
+});
+app.use('/icons', express.static(path.join(PUBLIC, 'icons'), { maxAge: '7d' }));
 app.post('/api/login', auth.login);
 app.post('/api/logout', auth.logout);
 

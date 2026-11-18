@@ -336,7 +336,9 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#compose').requestSubmit(); }
   });
   $('#new-conv').addEventListener('click', () => { $('#search').value = ''; openConversation(null); setMode('ask'); $('#input').focus(); });
-  $('#menu').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+  $('#menu').addEventListener('click', (e) => { e.stopPropagation(); $('#sidebar').classList.toggle('open'); });
+  // On phones, tapping outside the open menu closes it.
+  document.querySelector('.main').addEventListener('click', () => $('#sidebar').classList.remove('open'));
   $('#logout').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; });
   $('#rename').addEventListener('click', async () => {
     const t = prompt('Rename this discussion', current.title);
@@ -354,6 +356,27 @@
       await loadList();
     } catch (err) { alert(err.message); }
   });
+
+  // ---------- install as a phone/desktop app ----------
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // show our own button instead of the browser's banner
+    installPrompt = e;
+    $('#install').style.display = '';
+  });
+  $('#install').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => {});
+    installPrompt = null;
+    $('#install').style.display = 'none';
+  });
+  window.addEventListener('appinstalled', () => { $('#install').style.display = 'none'; });
+  // iPhone/iPad Safari has no install prompt: show how to add it by hand.
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIos && !standalone) $('#install-hint').style.display = '';
 
   // ---------- start ----------
   (async () => {

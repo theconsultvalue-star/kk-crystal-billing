@@ -2,9 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Ask your CA</title>
 <link rel="stylesheet" href="/style.css" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#1f5f8b" />
+<link rel="icon" type="image/png" href="/icons/favicon-32.png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Ask CA" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 </head>
 <body>
 <div class="layout">
@@ -14,6 +22,8 @@
       <div class="whoami"><span>Logged in as <strong id="me"></strong></span><button id="logout" class="btn-text">Log out</button></div>
       <button id="new-conv" class="btn-primary">+ New question</button>
       <input id="search" type="search" placeholder="Search all past discussions…" />
+      <button id="install" class="btn-plain install-btn" style="display:none">📲 Install app on this device</button>
+      <div id="install-hint" class="install-hint" style="display:none">To install on iPhone: tap <strong>Share</strong> <span aria-hidden="true">⬆︎</span> then <strong>Add to Home Screen</strong>.</div>
     </div>
     <div id="conv-list" class="conv-list"></div>
   </aside>

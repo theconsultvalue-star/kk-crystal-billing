@@ -45,6 +45,16 @@ Then open http://localhost:4500.
 
 **Adding or removing a person:** edit `ASKCA_USERS` and restart. Someone removed from the list loses access immediately, but their past questions and notes stay in the knowledge base.
 
+## Installing on phones
+
+Once the app is online (it must be on an `https://` address, which hosts like Render give you), each person opens the link on their phone and logs in once:
+
+- **Android (Chrome):** tap **Install app on this device** in the menu (☰), or Chrome's menu → **Install app** / **Add to Home screen**.
+- **iPhone (Safari):** tap **Share** → **Add to Home Screen**. The menu shows this hint on iPhones.
+- **Laptop (Chrome/Edge):** click the install icon in the address bar, or **Install app on this device** in the sidebar.
+
+It then opens full-screen from its own "Ask CA" icon, like any app. Nothing is stored on the phone apart from the login: every question, answer and note is saved in the central database, and everyone sees them straight away on any device. App updates reach phones automatically the next time the app is opened.
+
 ## Notes
 
 - Only the person who started a discussion can delete it. Deleting removes it from the knowledge base for everyone.

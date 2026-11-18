@@ -2,9 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Ask your CA — Log in</title>
 <link rel="stylesheet" href="/style.css" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#1f5f8b" />
+<link rel="icon" type="image/png" href="/icons/favicon-32.png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Ask CA" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 </head>
 <body class="login-body">
   <form id="login" class="login-card">
@@ -30,6 +38,7 @@ document.getElementById('login').addEventListener('submit', async (e) => {
   if (r.ok) location.href = '/';
   else err.textContent = (await r.json().catch(() => ({}))).error || 'Login failed.';
 });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 </script>
 </body>
 </html>
