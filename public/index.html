@@ -17,7 +17,6 @@
       <button class="tab-btn" data-tab="parties">Sale Parties</button>
       <button class="tab-btn" data-tab="items">Items</button>
       <button class="tab-btn" data-tab="settings">Business Settings</button>
-      <button class="tab-btn" data-tab="askca">Ask your CA</button>
     </nav>
   </header>
 
@@ -514,44 +513,9 @@
         </div>
       </form>
     </section>
-    <!-- ASK YOUR CA -->
-    <section id="tab-askca" class="tab-panel">
-      <div class="card ca-card">
-        <div class="ca-head">
-          <div>
-            <h2>Ask your CA</h2>
-            <p class="hint ca-sub">Accounting, income tax, GST, TDS, ROC/MCA compliance, audit, costing, FEMA and finance — textbook and practical. Checks the latest notifications and due dates on the web.</p>
-          </div>
-          <button type="button" id="ca-new" class="btn-link">New chat</button>
-        </div>
-
-        <div id="ca-notice" class="ca-notice" style="display:none"></div>
-
-        <div id="ca-thread" class="ca-thread">
-          <div id="ca-empty" class="ca-empty">
-            <p>Try asking:</p>
-            <div class="ca-chips">
-              <button type="button" class="ca-chip">Which GST, TDS and ROC due dates fall this month?</button>
-              <button type="button" class="ca-chip">Can I claim ITC on a car purchased for business? Explain section 17(5).</button>
-              <button type="button" class="ca-chip">I got a DRC-01A intimation. What should I do and by when?</button>
-              <button type="button" class="ca-chip">Old vs new tax regime for a salaried person earning ₹18 lakh — which is better?</button>
-              <button type="button" class="ca-chip">Annual ROC filings for a small private limited company — forms and due dates?</button>
-              <button type="button" class="ca-chip">Explain Ind AS 115 five-step model with a journal-entry example.</button>
-            </div>
-          </div>
-        </div>
-
-        <form id="ca-form" class="ca-form">
-          <textarea id="ca-input" rows="2" placeholder="Ask anything — e.g. TDS on rent paid to a partner, 43B(h) MSME payments, tax audit limit…"></textarea>
-          <button type="submit" id="ca-send" class="btn-primary">Ask</button>
-        </form>
-        <p class="ca-disclaimer">Answers are guidance, not a signed professional opinion. Verify before filing, and consult your engaged CA/CS/advocate for high-stakes matters.</p>
-      </div>
-    </section>
   </main>
 </div>
 
 <script src="app.js"></script>
-<script src="askca.js"></script>
 </body>
 </html>
