@@ -8,6 +8,7 @@ const auth = require('./auth');
 const store = require('./store');
 const agent = require('./agent');
 const knowledge = require('./knowledge');
+const clients = require('./clients');
 
 const app = express();
 const PORT = process.env.PORT || 4500;
@@ -41,7 +42,10 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
 });
 
 app.get('/api/me', (req, res) => {
-  res.json({ name: req.user, team: auth.teamNames(), aiConfigured: !!process.env.ANTHROPIC_API_KEY });
+  res.json({
+    name: req.user, team: auth.teamNames(), isOwner: auth.isOwner(req.user), owner: auth.ownerName(),
+    aiConfigured: !!process.env.ANTHROPIC_API_KEY, services: clients.SERVICES
+  });
 });
 
 app.get('/api/conversations', wrap(async (req, res) => {
@@ -56,16 +60,26 @@ app.get('/api/conversations/:id', wrap(async (req, res) => {
 }));
 
 app.patch('/api/conversations/:id', wrap(async (req, res) => {
-  const title = String((req.body || {}).title || '').trim().slice(0, 150);
-  if (!title) return res.status(400).json({ error: 'Title is required.' });
-  if (!(await store.renameConversation(req.params.id, title))) return res.status(404).json({ error: 'Discussion not found.' });
+  const body = req.body || {};
+  if (!(await store.getConversation(req.params.id))) return res.status(404).json({ error: 'Discussion not found.' });
+  if ('title' in body) {
+    const title = String(body.title || '').trim().slice(0, 150);
+    if (!title) return res.status(400).json({ error: 'Title is required.' });
+    await store.renameConversation(req.params.id, title);
+  }
+  if ('clientId' in body) {
+    if (body.clientId && !(await clients.getClient(body.clientId))) return res.status(400).json({ error: 'Client not found.' });
+    await store.setConversationClient(req.params.id, body.clientId || null);
+  }
   res.json({ ok: true });
 }));
 
 app.delete('/api/conversations/:id', wrap(async (req, res) => {
   const conv = await store.getConversation(req.params.id);
   if (!conv) return res.status(404).json({ error: 'Discussion not found.' });
-  if (conv.createdBy !== req.user) return res.status(403).json({ error: `Only ${conv.createdBy}, who started this discussion, can delete it.` });
+  if (conv.createdBy !== req.user && !auth.isOwner(req.user)) {
+    return res.status(403).json({ error: `Only ${conv.createdBy}, who started this discussion, can delete it.` });
+  }
   await store.deleteConversation(req.params.id);
   res.json({ ok: true });
 }));
@@ -89,6 +103,59 @@ app.get('/api/search', wrap(async (req, res) => {
   })));
 }));
 
+// ---- Clients ----
+app.get('/api/clients', wrap(async (req, res) => {
+  res.json((await clients.listClients()).map((c) => ({
+    id: c.id, name: c.name, entityType: c.profile.entityType || '', assignedTo: c.profile.assignedTo || '',
+    gstin: c.profile.gstin || '', pan: c.profile.pan || '', updatedAt: c.updatedAt
+  })));
+}));
+
+app.get('/api/clients/:id', wrap(async (req, res) => {
+  const c = await clients.getClient(req.params.id);
+  if (!c) return res.status(404).json({ error: 'Client not found.' });
+  res.json(c);
+}));
+
+app.post('/api/clients', wrap(async (req, res) => {
+  const { name, profile } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Client name is required.' });
+  if (await clients.findByName(name)) return res.status(409).json({ error: 'A client with this name already exists.' });
+  res.json(await clients.createClient({ name, profile, by: req.user }));
+}));
+
+app.put('/api/clients/:id', wrap(async (req, res) => {
+  const { name, profile } = req.body || {};
+  if (name && (await clients.findByName(name, req.params.id))) return res.status(409).json({ error: 'Another client already has this name.' });
+  const c = await clients.updateClient(req.params.id, { name, profile, by: req.user });
+  if (!c) return res.status(404).json({ error: 'Client not found.' });
+  res.json(c);
+}));
+
+app.delete('/api/clients/:id', wrap(async (req, res) => {
+  if (!auth.isOwner(req.user)) return res.status(403).json({ error: `Only ${auth.ownerName()} can delete a client file.` });
+  if (!(await clients.deleteClient(req.params.id))) return res.status(404).json({ error: 'Client not found.' });
+  res.json({ ok: true });
+}));
+
+app.post('/api/clients/:id/items', wrap(async (req, res) => {
+  const { kind, text } = req.body || {};
+  if (!text || !String(text).trim()) return res.status(400).json({ error: 'Write something to add.' });
+  const item = await clients.addItem(req.params.id, { kind, author: req.user, text: String(text).trim() });
+  if (!item) return res.status(404).json({ error: 'Client not found.' });
+  res.json(item);
+}));
+
+app.delete('/api/clients/:id/items/:itemId', wrap(async (req, res) => {
+  const item = await clients.getItem(req.params.id, req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'Entry not found.' });
+  if (item.kind === 'change') return res.status(403).json({ error: 'Change records cannot be removed.' });
+  const mine = item.author === req.user || item.author === `${req.user} (via Ask your CA)`;
+  if (!mine && !auth.isOwner(req.user)) return res.status(403).json({ error: 'You can only remove entries you added.' });
+  await clients.deleteItem(req.params.id, req.params.itemId);
+  res.json({ ok: true });
+}));
+
 // Ask a question — in an existing discussion (conversationId) or a new one.
 // The answer streams back as newline-delimited JSON events.
 const busy = new Set();
@@ -108,9 +175,11 @@ app.post('/api/ask', wrap(async (req, res) => {
     return res.status(409).json({ error: 'Someone is already asking in this discussion — wait for that answer, then ask.' });
   }
   if (!conv) {
+    const clientId = req.body.clientId && (await clients.getClient(req.body.clientId)) ? req.body.clientId : null;
     const title = question.replace(/\s+/g, ' ').slice(0, 90) + (question.length > 90 ? '…' : '');
-    conv = await store.createConversation({ title, createdBy: req.user });
+    conv = await store.createConversation({ title, createdBy: req.user, clientId });
   }
+  const client = conv.clientId ? await clients.getClient(conv.clientId) : null;
   busy.add(conv.id);
 
   res.set('Content-Type', 'application/x-ndjson; charset=utf-8');
@@ -124,11 +193,16 @@ app.post('/api/ask', wrap(async (req, res) => {
   emit({ type: 'conversation', id: conv.id, title: conv.title });
   try {
     const result = await agent.answer({
-      priorApi: conv.api, question, author: req.user, conversationId: conv.id, emit, isAborted: () => aborted
+      priorApi: conv.api, question, author: req.user, clientName: client ? client.name : null,
+      conversationId: conv.id, emit, isAborted: () => aborted
     });
     const items = await store.saveExchange(conv.id, {
       author: req.user, question, answer: result.answer, sources: result.sources, api: result.api
     });
+    // A discussion that turned out to be about exactly one client gets linked to it.
+    if (!conv.clientId && result.clientIds.length === 1) {
+      await store.setConversationClient(conv.id, result.clientIds[0]);
+    }
     emit({ type: 'done', items });
   } catch (err) {
     if (err.message !== 'aborted') {

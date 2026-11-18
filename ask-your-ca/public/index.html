@@ -20,42 +20,60 @@
     <div class="side-top">
       <div class="brand"><span class="brand-mark">CA</span> Ask your CA</div>
       <div class="whoami"><span>Logged in as <strong id="me"></strong></span><button id="logout" class="btn-text">Log out</button></div>
-      <button id="new-conv" class="btn-primary">+ New question</button>
-      <input id="search" type="search" placeholder="Search all past discussions…" />
+      <div class="seg" role="tablist">
+        <button type="button" data-section="discussions" class="active">Discussions</button>
+        <button type="button" data-section="clients">Clients</button>
+      </div>
+      <div id="side-discussions" class="side-tools">
+        <button id="new-conv" class="btn-primary">+ New question</button>
+        <input id="search" type="search" placeholder="Search all past discussions…" />
+      </div>
+      <div id="side-clients" class="side-tools" style="display:none">
+        <button id="new-client" class="btn-primary">+ Add client</button>
+        <input id="client-filter" type="search" placeholder="Find client by name, PAN, GSTIN, person…" />
+        <label class="check-line"><input type="checkbox" id="only-mine" /> Only clients I handle</label>
+      </div>
       <button id="install" class="btn-plain install-btn" style="display:none">📲 Install app on this device</button>
       <div id="install-hint" class="install-hint" style="display:none">To install on iPhone: tap <strong>Share</strong> <span aria-hidden="true">⬆︎</span> then <strong>Add to Home Screen</strong>.</div>
     </div>
-    <div id="conv-list" class="conv-list"></div>
+    <div id="side-list" class="conv-list"></div>
   </aside>
 
   <main class="main">
-    <header id="conv-head" class="conv-head">
-      <div style="display:flex;align-items:flex-start;min-width:0">
-        <button id="menu" class="btn-plain menu-btn" aria-label="Show discussions">☰</button>
+    <header class="conv-head">
+      <div class="head-left">
+        <button id="menu" class="btn-plain menu-btn" aria-label="Show menu">☰</button>
         <div style="min-width:0">
-          <h1 id="conv-title">New question</h1>
-          <div id="conv-meta" class="conv-meta">Ask anything — the whole team will see it, and it becomes part of the shared knowledge base.</div>
+          <h1 id="head-title">New question</h1>
+          <div id="head-meta" class="conv-meta"></div>
         </div>
       </div>
-      <div id="head-actions" class="head-actions" style="display:none">
-        <button id="rename" class="btn-text">Rename</button>
-        <button id="delete" class="btn-text danger">Delete</button>
-      </div>
+      <div id="head-actions" class="head-actions"></div>
     </header>
 
-    <div id="thread" class="thread"></div>
-
-    <div class="composer">
-      <div class="mode" id="mode">
-        <button type="button" data-mode="ask" class="active">Ask the CA</button>
-        <button type="button" data-mode="note" class="note-mode" id="note-mode-btn" disabled title="Open a discussion to add a team note">Add team note</button>
+    <!-- Discussion view -->
+    <div id="view-chat" class="view">
+      <div id="thread" class="thread"></div>
+      <div class="composer">
+        <div class="composer-top">
+          <div class="mode" id="mode">
+            <button type="button" data-mode="ask" class="active">Ask the CA</button>
+            <button type="button" data-mode="note" class="note-mode" id="note-mode-btn" disabled title="Open a discussion to add a team note">Add team note</button>
+          </div>
+          <label class="client-pick">Client
+            <select id="client-select"><option value="">— none —</option></select>
+          </label>
+        </div>
+        <form id="compose" class="compose-row">
+          <textarea id="input" rows="2" placeholder="Ask anything — e.g. TDS on rent paid to a partner, 43B(h) MSME payments, tax audit limit…"></textarea>
+          <button type="submit" id="send" class="btn-primary">Ask</button>
+        </form>
+        <p class="disclaimer">Answers are guidance, not a signed professional opinion. Verify before filing. Tip: “note for Sharma Travels: prefers WhatsApp” saves it to the client file.</p>
       </div>
-      <form id="compose" class="compose-row">
-        <textarea id="input" rows="2" placeholder="Ask anything — e.g. TDS on rent paid to a partner, 43B(h) MSME payments, tax audit limit…"></textarea>
-        <button type="submit" id="send" class="btn-primary">Ask</button>
-      </form>
-      <p class="disclaimer">Answers are guidance, not a signed professional opinion. Verify before filing. Team notes record what you actually did or decided — the advisor reads them in later questions.</p>
     </div>
+
+    <!-- Client view -->
+    <div id="view-client" class="view client-view" style="display:none"></div>
   </main>
 </div>
 <script src="/app.js"></script>

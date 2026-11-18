@@ -12,6 +12,18 @@ It is fully separate from the billing app in the parent folder. It has its own s
 - **Team notes.** Inside any discussion you can add a note about what you actually did or decided, e.g. "Filed reply on 12 Nov; officer accepted it." Notes carry extra weight in later answers.
 - **Current law.** The advisor searches the web for the latest notifications, circulars and due dates, preferring government and institute sites. It lists its sources under each answer.
 - **Search.** The search box in the sidebar searches every past question, answer and note.
+- **Client files.** The **Clients** tab keeps one complete file per client, so a new employee can take over instantly. Each file holds:
+  - contact people, with tap-to-call, WhatsApp and email
+  - PAN, GSTIN, TAN, CIN, address and state
+  - services handled and who handles the client
+  - preferences, fees, portal user IDs, and an "always remember" box
+  - a dated history of notes (note, preference, compliance/filing, call/meeting), with who added each one
+  - every discussion about the client
+
+  Every change to a file is recorded with who made it and when.
+- **Talk to it naturally.** Type "note for Sharma Travels: Rakesh wants the GSTR-9 draft by 10 Dec" and the advisor saves it to that client's file. Ask "brief me on Sharma Travels, I'm taking over" for a full handover summary. When you ask about a client, the advisor reads that client's file and applies it to the answer.
+- **Owner.** The first name in `ASKCA_USERS` is the owner (e.g. the partner). Only the owner can delete a client file or someone else's discussion. Everyone else can add and edit, and every change is recorded.
+- **Free to use without the API key.** Client files, discussions, notes and search all work without `ANTHROPIC_API_KEY`. Only the advisor's answers need it.
 
 ## Setup
 
@@ -26,8 +38,8 @@ Set these environment variables (on a host, add them as secrets):
 
 | Variable | Required | What it is |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | yes | Claude API key from console.anthropic.com |
-| `ASKCA_USERS` | yes | Team logins as `Name:password` pairs separated by commas, e.g. `Ramesh:pass-one,Sita:pass-two,Arjun:pass-three` |
+| `ANTHROPIC_API_KEY` | for answers | Claude API key from console.anthropic.com. Without it, everything except the advisor's answers still works. |
+| `ASKCA_USERS` | yes | Team logins as `Name:password` pairs separated by commas, e.g. `Ramesh:pass-one,Sita:pass-two,Arjun:pass-three`. The first name is the owner. |
 | `SESSION_SECRET` | yes | Any long random string. It keeps people logged in across restarts. |
 | `DATABASE_URL` | for hosting | Postgres connection string. Without it, data is saved to `data/askca.json`. |
 | `PGSSL` | no | Set to `disable` if your Postgres does not use SSL (e.g. a local database) |
@@ -61,4 +73,5 @@ It then opens full-screen from its own "Ask CA" icon, like any app. Nothing is s
 - If two people ask in the same discussion at the same moment, the second is asked to wait for the first answer.
 - An answer that fails or is interrupted is not saved, so the knowledge base holds only complete answers.
 - Cost: Claude Opus 5.5 is billed at $4 per million input tokens and $20 per million output tokens, plus web searches. Long discussions cost more per question, because the whole discussion is sent each time. Start a new discussion for a new topic.
+- Never put passwords or OTPs in client files. Keep them in a password manager. The advisor refuses to store them.
 - Answers are guidance, not a signed professional opinion.

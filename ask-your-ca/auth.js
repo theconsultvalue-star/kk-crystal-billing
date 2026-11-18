@@ -114,4 +114,13 @@ function requireUser(req, res, next) {
   res.redirect('/login');
 }
 
-module.exports = { login, logout, requireUser, teamNames: () => [...USERS.values()].map((u) => u.name) };
+// The first person listed in ASKCA_USERS is the owner (e.g. the partner):
+// only they can delete client files or other people's discussions.
+const OWNER = USERS.size ? [...USERS.values()][0].name : null;
+
+module.exports = {
+  login, logout, requireUser,
+  teamNames: () => [...USERS.values()].map((u) => u.name),
+  isOwner: (name) => name === OWNER,
+  ownerName: () => OWNER
+};

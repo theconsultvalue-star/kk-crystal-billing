@@ -55,6 +55,25 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS askca_items_conv ON askca_items (conversation_id, created_at);
+    CREATE TABLE IF NOT EXISTS askca_clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      profile JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_by TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS askca_client_items (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES askca_clients(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      author TEXT NOT NULL,
+      text TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS askca_client_items_client ON askca_client_items (client_id, created_at);
+    ALTER TABLE askca_conversations ADD COLUMN IF NOT EXISTS client_id TEXT REFERENCES askca_clients(id) ON DELETE SET NULL;
   `);
 }
 
@@ -63,7 +82,7 @@ const rowToItem = (r) => ({
   text: r.text, sources: r.sources || [], createdAt: new Date(r.created_at).toISOString()
 });
 const rowToConv = (r) => ({
-  id: r.id, title: r.title, createdBy: r.created_by,
+  id: r.id, title: r.title, createdBy: r.created_by, clientId: r.client_id || null,
   createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString()
 });
 
@@ -77,6 +96,7 @@ function readFile() {
   if (!fileCache) {
     try { fileCache = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
     catch (e) { fileCache = { conversations: [] }; }
+    if (!Array.isArray(fileCache.clients)) fileCache.clients = [];
   }
   return fileCache;
 }
@@ -94,7 +114,7 @@ function mutateFile(fn) {
   return run;
 }
 
-const summarize = (c) => ({ id: c.id, title: c.title, createdBy: c.createdBy, createdAt: c.createdAt, updatedAt: c.updatedAt });
+const summarize = (c) => ({ id: c.id, title: c.title, createdBy: c.createdBy, clientId: c.clientId || null, createdAt: c.createdAt, updatedAt: c.updatedAt });
 
 // ---------------- API ----------------
 
@@ -127,12 +147,12 @@ async function getConversation(id) {
   return c ? JSON.parse(JSON.stringify(c)) : null;
 }
 
-async function createConversation({ title, createdBy }) {
-  const conv = { id: newId(), title, createdBy, createdAt: now(), updatedAt: now(), api: [], items: [] };
+async function createConversation({ title, createdBy, clientId = null }) {
+  const conv = { id: newId(), title, createdBy, clientId, createdAt: now(), updatedAt: now(), api: [], items: [] };
   if (USE_DB) {
     await db().query(
-      'INSERT INTO askca_conversations (id, title, created_by, created_at, updated_at) VALUES ($1,$2,$3,$4,$4)',
-      [conv.id, title, createdBy, conv.createdAt]
+      'INSERT INTO askca_conversations (id, title, created_by, client_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$5)',
+      [conv.id, title, createdBy, clientId, conv.createdAt]
     );
     return conv;
   }
@@ -211,6 +231,18 @@ async function renameConversation(id, title) {
   });
 }
 
+async function setConversationClient(id, clientId) {
+  if (USE_DB) {
+    const r = await db().query('UPDATE askca_conversations SET client_id = $2 WHERE id = $1', [id, clientId]);
+    return r.rowCount > 0;
+  }
+  return mutateFile((data) => {
+    const c = data.conversations.find((x) => x.id === id);
+    if (c) c.clientId = clientId;
+    return !!c;
+  });
+}
+
 async function deleteConversation(id) {
   if (USE_DB) {
     const r = await db().query('DELETE FROM askca_conversations WHERE id = $1', [id]);
@@ -240,5 +272,7 @@ async function allItems() {
 
 module.exports = {
   usingDatabase: USE_DB, ensureSchema, listConversations, getConversation, createConversation,
-  saveExchange, addNote, renameConversation, deleteConversation, allItems
+  saveExchange, addNote, renameConversation, setConversationClient, deleteConversation, allItems,
+  // shared with clients.js
+  _internal: { db, readFile, mutateFile, newId, now }
 };

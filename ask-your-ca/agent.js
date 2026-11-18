@@ -10,6 +10,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const knowledge = require('./knowledge');
+const clients = require('./clients');
 
 const MODEL = process.env.ASK_CA_MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.ASK_CA_EFFORT || 'high';
@@ -29,6 +30,14 @@ When something from the knowledge base is relevant:
 - Give extra weight to team notes — they record what the team actually did, what a department accepted, or corrections to an earlier answer.
 - Past answers may be outdated or wrong. Re-check rates, thresholds, due dates and law that may have changed since, and say clearly when the current position differs from what was discussed earlier.
 - Do not repeat a past answer blindly; build on it.
+
+## Client files
+The firm keeps a file for each client: contacts, PAN/GSTIN/TAN/CIN, services handled, who handles it, preferences, fees, things to always remember, and a dated history of notes. These files exist so that anyone — including a new employee taking over — can serve the client immediately.
+- Whenever a question names a client, or the message says "[About client: …]", call lookup_client first and use the file: apply the client's facts (entity type, registrations, state, services, past decisions and preferences) to your answer, and point out anything in the history that matters (pending items, earlier positions taken, the client's preferences on how to communicate).
+- Questions like "who is the contact at X?", "what's pending for X?", "brief me on X, I'm taking over" are answered from the file: give a clear, organised handover summary.
+- When a team member asks you to note, record or remember something about a client, or clearly tells you a new lasting fact about a client (a new contact person or number, a preference, a decision taken, a filing done, a commitment made), save it with save_client_note — one clear, self-contained, dated note per fact, written so a stranger would understand it. Then say in one line what you saved. Do not save routine questions, your own advice, or guesses.
+- Never store passwords, OTPs or full bank/card numbers in a client file; if asked to, refuse and suggest a password manager.
+- If no file exists for a client, say so and suggest adding the client in the Clients section.
 
 ## How to answer
 1. **Lead with the direct answer** in one or two sentences — yes/no, the rate, the section, the form, the deadline — then explain.
@@ -72,9 +81,44 @@ const KB_TOOL = {
   eager_input_streaming: true
 };
 
+const CLIENT_LOOKUP_TOOL = {
+  name: 'lookup_client',
+  description:
+    "Open the firm's client file for a client: profile (contacts, PAN/GSTIN/TAN/CIN, address, services, who handles it, preferences, fees, things to always remember), the dated history of notes, and earlier team discussions about the client. " +
+    'Search by client name (partial names work), PAN or GSTIN. Returns up to 3 best matches.',
+  input_schema: {
+    type: 'object',
+    properties: { query: { type: 'string', description: 'Client name, PAN or GSTIN.' } },
+    required: ['query'],
+    additionalProperties: false
+  },
+  eager_input_streaming: true
+};
+
+const CLIENT_NOTE_TOOL = {
+  name: 'save_client_note',
+  description:
+    "Add a dated note to a client's file in the firm's records, attributed to the team member who asked. " +
+    'Use for lasting facts: new contact details, preferences, decisions, filings done, commitments, pending items. ' +
+    'Never include passwords, OTPs or full bank/card numbers.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      client: { type: 'string', description: 'Client name exactly as in the client file (use lookup_client first if unsure).' },
+      kind: { type: 'string', enum: ['note', 'preference', 'compliance', 'call'], description: 'note = general; preference = how the client likes things done; compliance = filing/notice/deadline; call = call or meeting record.' },
+      text: { type: 'string', description: 'The note, self-contained and clear to someone new to this client.' }
+    },
+    required: ['client', 'kind', 'text'],
+    additionalProperties: false
+  },
+  eager_input_streaming: true
+};
+
 const TOOLS = [
   { type: 'web_search_20260209', name: 'web_search', max_uses: 6, user_location: { type: 'approximate', country: 'IN', timezone: 'Asia/Kolkata' } },
-  KB_TOOL
+  KB_TOOL,
+  CLIENT_LOOKUP_TOOL,
+  CLIENT_NOTE_TOOL
 ];
 
 function collectSources(content) {
@@ -99,15 +143,62 @@ async function runKnowledgeTool(block, conversationId, emit, seen) {
   return { type: 'tool_result', tool_use_id: block.id, content: knowledge.formatForModel(results) };
 }
 
+const badInput = (block) => ({
+  type: 'tool_result', tool_use_id: block.id, is_error: true,
+  content: JSON.stringify({ INVALID_JSON: JSON.stringify(block.input) })
+});
+const isText = (v) => typeof v === 'string' && v.trim().length > 0;
+
+async function runLookupClient(block, emit, touched, conversationId) {
+  if (!block.input || !isText(block.input.query)) return badInput(block);
+  const found = await clients.search(block.input.query, 3);
+  const files = [];
+  for (const c of found) {
+    const file = await clients.getClient(c.id);
+    file.conversations = file.conversations.filter((d) => d.id !== conversationId);
+    files.push(file);
+  }
+  if (files.length === 1) touched.add(files[0].id);
+  emit({ type: 'client_looked_up', clients: files.map((c) => ({ id: c.id, name: c.name })) });
+  return {
+    type: 'tool_result', tool_use_id: block.id,
+    content: files.length
+      ? files.map(clients.formatForModel).join('\n\n=====\n\n')
+      : `No client file matches "${block.input.query}". The team can add it in the Clients section.`
+  };
+}
+
+async function runSaveClientNote(block, author, emit, touched) {
+  const input = block.input || {};
+  if (!isText(input.client) || !isText(input.text) || !['note', 'preference', 'compliance', 'call'].includes(input.kind)) return badInput(block);
+  const found = await clients.search(input.client, 3);
+  const exact = found.find((c) => c.name.toLowerCase() === input.client.trim().toLowerCase());
+  const target = exact || (found.length === 1 ? found[0] : null);
+  if (!target) {
+    return {
+      type: 'tool_result', tool_use_id: block.id, is_error: true,
+      content: found.length
+        ? `Several clients match "${input.client}": ${found.map((c) => c.name).join('; ')}. Ask which one, or use the exact name.`
+        : `No client file named "${input.client}". Nothing saved — suggest adding the client in the Clients section first.`
+    };
+  }
+  touched.add(target.id);
+  const item = await clients.addItem(target.id, { kind: input.kind, author: `${author} (via Ask your CA)`, text: input.text.trim() });
+  emit({ type: 'client_saved', client: { id: target.id, name: target.name }, kind: item.kind, text: item.text });
+  return { type: 'tool_result', tool_use_id: block.id, content: `Saved to ${target.name}'s file as a ${item.kind} note.` };
+}
+
 // Answers one question. `priorApi` is the discussion's saved transcript.
 // `emit` receives progress events for the browser. Resolves to
 // { answer, sources, api } on success; throws on failure (nothing is saved).
-async function answer({ priorApi, question, author, conversationId, emit, isAborted }) {
-  const messages = [...priorApi, { role: 'user', content: `[Asked by ${author}]\n${question}` }];
+async function answer({ priorApi, question, author, clientName, conversationId, emit, isAborted }) {
+  const header = `[Asked by ${author}]` + (clientName ? ` [About client: ${clientName}]` : '');
+  const messages = [...priorApi, { role: 'user', content: `${header}\n${question}` }];
   let answerText = '';
   const turnContent = [];
   let badJsonRetries = 0;
   const teamRefs = new Map(); // past discussions the advisor looked at
+  const touched = new Set();   // client files opened (single match) or updated
 
   for (let step = 0; step < MAX_STEPS; step++) {
     if (isAborted()) throw new Error('aborted');
@@ -134,7 +225,7 @@ async function answer({ priorApi, question, author, conversationId, emit, isAbor
           const b = event.content_block;
           if (b.type === 'thinking') emit({ type: 'status', status: 'thinking' });
           else if (b.type === 'server_tool_use') emit({ type: 'status', status: 'searching_web' });
-          else if (b.type === 'tool_use') emit({ type: 'status', status: 'searching_kb' });
+          else if (b.type === 'tool_use') emit({ type: 'status', status: b.name === KB_TOOL.name ? 'searching_kb' : 'client_file' });
           else if (b.type === 'text') emit({ type: 'status', status: 'writing' });
         } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           stepText += event.delta.text;
@@ -166,9 +257,10 @@ async function answer({ priorApi, question, author, conversationId, emit, isAbor
     if (message.stop_reason === 'tool_use' && toolUses.length) {
       const results = [];
       for (const b of toolUses) {
-        results.push(b.name === KB_TOOL.name
-          ? await runKnowledgeTool(b, conversationId, emit, teamRefs)
-          : { type: 'tool_result', tool_use_id: b.id, is_error: true, content: `Unknown tool ${b.name}` });
+        if (b.name === KB_TOOL.name) results.push(await runKnowledgeTool(b, conversationId, emit, teamRefs));
+        else if (b.name === CLIENT_LOOKUP_TOOL.name) results.push(await runLookupClient(b, emit, touched, conversationId));
+        else if (b.name === CLIENT_NOTE_TOOL.name) results.push(await runSaveClientNote(b, author, emit, touched));
+        else results.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: `Unknown tool ${b.name}` });
       }
       messages.push({ role: 'user', content: results });
       continue;
@@ -180,7 +272,10 @@ async function answer({ priorApi, question, author, conversationId, emit, isAbor
   }
 
   if (!answerText.trim()) throw new Error('No answer was produced. Please try again.');
-  return { answer: answerText, sources: [...collectSources(turnContent), ...teamRefs.values()], api: messages };
+  return {
+    answer: answerText, sources: [...collectSources(turnContent), ...teamRefs.values()], api: messages,
+    clientIds: [...touched]
+  };
 }
 
 function friendlyError(err) {
