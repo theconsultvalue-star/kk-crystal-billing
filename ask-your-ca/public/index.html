@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ask your CA</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar" class="sidebar">
+    <div class="side-top">
+      <div class="brand"><span class="brand-mark">CA</span> Ask your CA</div>
+      <div class="whoami"><span>Logged in as <strong id="me"></strong></span><button id="logout" class="btn-text">Log out</button></div>
+      <button id="new-conv" class="btn-primary">+ New question</button>
+      <input id="search" type="search" placeholder="Search all past discussions…" />
+    </div>
+    <div id="conv-list" class="conv-list"></div>
+  </aside>
+
+  <main class="main">
+    <header id="conv-head" class="conv-head">
+      <div style="display:flex;align-items:flex-start;min-width:0">
+        <button id="menu" class="btn-plain menu-btn" aria-label="Show discussions">☰</button>
+        <div style="min-width:0">
+          <h1 id="conv-title">New question</h1>
+          <div id="conv-meta" class="conv-meta">Ask anything — the whole team will see it, and it becomes part of the shared knowledge base.</div>
+        </div>
+      </div>
+      <div id="head-actions" class="head-actions" style="display:none">
+        <button id="rename" class="btn-text">Rename</button>
+        <button id="delete" class="btn-text danger">Delete</button>
+      </div>
+    </header>
+
+    <div id="thread" class="thread"></div>
+
+    <div class="composer">
+      <div class="mode" id="mode">
+        <button type="button" data-mode="ask" class="active">Ask the CA</button>
+        <button type="button" data-mode="note" class="note-mode" id="note-mode-btn" disabled title="Open a discussion to add a team note">Add team note</button>
+      </div>
+      <form id="compose" class="compose-row">
+        <textarea id="input" rows="2" placeholder="Ask anything — e.g. TDS on rent paid to a partner, 43B(h) MSME payments, tax audit limit…"></textarea>
+        <button type="submit" id="send" class="btn-primary">Ask</button>
+      </form>
+      <p class="disclaimer">Answers are guidance, not a signed professional opinion. Verify before filing. Team notes record what you actually did or decided — the advisor reads them in later questions.</p>
+    </div>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

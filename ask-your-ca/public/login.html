@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ask your CA — Log in</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body class="login-body">
+  <form id="login" class="login-card">
+    <div class="brand"><span class="brand-mark">CA</span> Ask your CA</div>
+    <p class="muted">Your team's advisor for accounting, tax, ROC compliance and finance.</p>
+    <label for="username">Name</label>
+    <input id="username" autocomplete="username" required autofocus />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required />
+    <button type="submit" class="btn-primary">Log in</button>
+    <p id="err" class="error-text"></p>
+  </form>
+<script>
+document.getElementById('login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('err');
+  err.textContent = '';
+  const r = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: document.getElementById('username').value, password: document.getElementById('password').value })
+  });
+  if (r.ok) location.href = '/';
+  else err.textContent = (await r.json().catch(() => ({}))).error || 'Login failed.';
+});
+</script>
+</body>
+</html>
