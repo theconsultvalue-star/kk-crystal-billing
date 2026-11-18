@@ -7,6 +7,7 @@ const { createInvoice } = require('./createInvoice');
 const { parseShorthand } = require('./quickbill');
 const { buildEwayBillJson } = require('./ewaybill');
 const { buildTallyXml } = require('./tally');
+const askCa = require('./askca');
 
 const app = express();
 const PORT = process.env.PORT || 4321;
@@ -42,7 +43,7 @@ app.use((req, res, next) => {
   res.status(401).send('Authentication required.');
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // Ask your CA conversations carry search results
 app.use(express.static(path.join(__dirname, 'public')));
 
 // PDFs come from Postgres when a database is configured (hosted deployment),
@@ -232,6 +233,27 @@ app.get('/api/tally-export', async (req, res) => {
   res.set('Content-Type', 'application/xml');
   res.set('Content-Disposition', `attachment; filename="${name}"`);
   res.send(xml);
+});
+
+// ---- Ask your CA ----
+// The browser keeps the conversation and sends it back each time; the answer
+// streams back as newline-delimited JSON events (see askca.js).
+app.get('/api/ask-ca/status', (req, res) => {
+  res.json({ configured: askCa.isConfigured() });
+});
+
+app.post('/api/ask-ca', async (req, res) => {
+  if (!askCa.isConfigured()) {
+    return res.status(503).json({ error: 'Set the ANTHROPIC_API_KEY environment variable on the server to enable Ask your CA.' });
+  }
+  const { messages } = req.body || {};
+  const problem = askCa.validateHistory(messages);
+  if (problem) return res.status(400).json({ error: problem });
+  res.set('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.set('Cache-Control', 'no-cache');
+  res.set('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  await askCa.streamAnswer(messages, res);
 });
 
 (async () => {
